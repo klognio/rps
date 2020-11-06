@@ -1,0 +1,38 @@
+name: RPS Pipeline
+
+on: [push]
+
+env:
+  DOCKER_HUB_USERNAME: kesarinandan
+
+jobs:
+  build-pack-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Startup test database instance
+        run: sudo service mysql start
+      - name: Create rps database and rpsuser
+        run: |
+          mysql -uroot -proot < db/createdb.sql
+      - name: Build with Gradle
+        run: ./gradlew bootBuildImage --imageName=${{env.DOCKER_HUB_USERNAME}}/rps:build-${{github.run_number}}
+      - run: sudo curl -sSL https://get.docker.com/ | sh
+      - run: docker login -u "${{env.DOCKER_HUB_USERNAME}}" -p "${{secrets.DOCKER_HUB_PASSWORD}}"
+      - run: docker push ${{env.DOCKER_HUB_USERNAME}}/rps:build-${{github.run_number}}
+  deploy:
+    needs: build-pack-and-publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: grep "github.run_number" k8s/rps.yaml
+      - run: sed -i 's/github.run_number/${{github.run_number}}/g' k8s/rps.yaml
+      - uses: actions-hub/kubectl@master
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        with:
+          args: apply -f k8s/rps.yaml

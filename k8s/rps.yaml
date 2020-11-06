@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: rps
-          image: raymondfanglimin/rps:build-github.run_number
+          image: kesarinandan/rps:build-github.run_number
 ---
 apiVersion: v1
 kind: Service
